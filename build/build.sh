@@ -5,5 +5,6 @@ self_dir=$(cd $(dirname $0); pwd)
 project_dir=$(dirname $self_dir)
 cd $project_dir
 
-go build -o ./debug/
+GOOS=windows go build -o ./debug/webrun.exe
+GOOS=linux go build -o ./debug/webrun
 
