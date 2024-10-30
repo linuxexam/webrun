@@ -1,27 +1,34 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"io/fs"
 	"log"
 	"net/http"
-	"time"
+	"os"
+	"runtime"
 
 	"github.com/coder/websocket"
+	"github.com/linuxexam/webrun/runwith"
 )
 
 //go:embed ui
 var UI embed.FS
 
-func main() {
-	//http.Handle("/", http.FileServer(http.Dir("ui")))
+const dev = false
 
-	sub, err := fs.Sub(UI, "ui")
-	if err != nil {
-		panic(err)
+func main() {
+
+	if dev {
+		http.Handle("/", http.FileServer(http.Dir("ui")))
+	} else {
+
+		sub, err := fs.Sub(UI, "ui")
+		if err != nil {
+			panic(err)
+		}
+		http.Handle("/", http.FileServer(http.FS(sub)))
 	}
-	http.Handle("/", http.FileServer(http.FS(sub)))
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, nil)
@@ -30,18 +37,14 @@ func main() {
 		}
 		defer c.CloseNow()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-
-		for {
-			_, buf, err := c.Read(ctx)
-			if err != nil {
-				log.Println(err)
-				break
-			}
-			log.Printf("received: %v", buf)
+		if runtime.GOOS == "windows" {
+			err = runwith.RunWithPipe(c, os.Args[1], os.Args[2:]...)
+		} else {
+			err = runwith.RunWithPipe(c, os.Args[1], os.Args[2:]...)
 		}
-		c.Close(websocket.StatusNormalClosure, "")
+		if err != nil {
+			log.Printf("command exit: %v", err)
+		}
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
