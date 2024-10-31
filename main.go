@@ -9,7 +9,6 @@ import (
 	"runtime"
 
 	"github.com/coder/websocket"
-	"github.com/linuxexam/webrun/runwith"
 )
 
 //go:embed ui
@@ -38,9 +37,9 @@ func main() {
 		defer c.CloseNow()
 
 		if runtime.GOOS == "windows" {
-			err = runwith.RunWithPipe(c, os.Args[1], os.Args[2:]...)
+			err = RunWithPipe(c, os.Args[1], os.Args[2:]...)
 		} else {
-			err = runwith.RunWithPipe(c, os.Args[1], os.Args[2:]...)
+			err = RunWithPty(c, os.Args[1], os.Args[2:]...)
 		}
 		if err != nil {
 			log.Printf("command exit: %v", err)

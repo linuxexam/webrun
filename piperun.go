@@ -1,4 +1,4 @@
-package runwith
+package main
 
 import (
 	"bytes"
