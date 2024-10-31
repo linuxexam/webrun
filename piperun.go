@@ -15,7 +15,7 @@ import (
 // This works on Windows as well, as there is no PTY involved
 // Without PTY, some simulation of line descipline function built into TTY driver
 // has to be somewhat impleted explicitly here. e.g. CTR+C
-func RunWithPipe(conn *websocket.Conn, name string, args ...string) error {
+func RunCommand_Pipe(conn *websocket.Conn, name string, args ...string) error {
 	ctx, cancelCmd := context.WithCancel(context.Background())
 	defer cancelCmd()
 

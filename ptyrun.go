@@ -10,7 +10,7 @@ import (
 )
 
 // ui --- websocket --- PTY master --- PTY slave(stdin,stdout,stderr and tty) --- command process
-func RunWithPty(conn *websocket.Conn, name string, args ...string) error {
+func RunCommand_Pty(conn *websocket.Conn, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
@@ -25,31 +25,29 @@ func RunWithPty(conn *websocket.Conn, name string, args ...string) error {
 			_, err := ptmx.Read(buf)
 			if err != nil {
 				log.Printf("ptmx.Read: %v", err)
-				break
+				return
 			}
 			if err := conn.Write(context.Background(), websocket.MessageBinary, buf); err != nil {
 				log.Printf("conn.Write: %v", err)
-				break
+				return
 			}
 		}
 	}()
 
 	// Read from conn, send to ptmx
-	go func() {
-		for {
-			_, buf, err := conn.Read(context.Background())
-			if err != nil {
-				log.Printf("conn.Write: %v", err)
-				break
-			}
-			if _, err := ptmx.Write(buf); err != nil {
-				log.Printf("ptmx.Write: %v", err)
-				break
-			}
+	for {
+		_, buf, err := conn.Read(context.Background())
+		if err != nil {
+			log.Printf("conn.Write: %v", err)
+			break
 		}
-	}()
+		if _, err := ptmx.Write(buf); err != nil {
+			log.Printf("ptmx.Write: %v", err)
+			break
+		}
+	}
 
-	// wait cmd to finish
+	// wait cmd
 	if err := cmd.Wait(); err != nil {
 		return err
 	}
