@@ -28,6 +28,7 @@ func RunCommand_Pty(conn *websocket.Conn, name string, args ...string) error {
 				log.Printf("ptmx.Read: %v", err)
 				return
 			}
+			log.Printf("read from ptmx: %v", buf)
 			if err := conn.Write(context.Background(), websocket.MessageBinary, buf); err != nil {
 				log.Printf("conn.Write: %v", err)
 				return
@@ -42,6 +43,8 @@ func RunCommand_Pty(conn *websocket.Conn, name string, args ...string) error {
 			log.Printf("conn.Write: %v", err)
 			break
 		}
+		log.Printf("read from websocket term: %v", buf)
+
 		if _, err := ptmx.Write(buf); err != nil {
 			log.Printf("ptmx.Write: %v", err)
 			break
