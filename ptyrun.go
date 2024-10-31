@@ -12,7 +12,8 @@ import (
 // ui --- websocket --- PTY master --- PTY slave(stdin,stdout,stderr and tty) --- command process
 func RunCommand_Pty(conn *websocket.Conn, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	ptmx, err := pty.Start(cmd)
+	var err error
+	ptmx, err = pty.Start(cmd)
 	if err != nil {
 		return err
 	}
