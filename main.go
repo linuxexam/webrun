@@ -27,7 +27,7 @@ func main() {
 		if runtime.GOOS == "windows" {
 			args = append(args, "cmd")
 		} else {
-			args = append(args, "bash")
+			args = append(args, "sh")
 		}
 	}
 
