@@ -39,7 +39,7 @@ function initWsTerm() {
 
     T.wsTerm.addEventListener("close", () => {
         console.log("WebSocket closed.");
-        term.write('\r\n\x1B[31mDisconnected!\r\nRefresh this page to reconnect.\x1B[0m')
+        T.term.write('\r\n\x1B[31mDisconnected!\r\nRefresh this page to reconnect.\x1B[0m')
     });
     T.wsTerm.addEventListener("error", () => {
         console.log("WebSocket error.");
