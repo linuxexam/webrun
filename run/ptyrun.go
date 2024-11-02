@@ -1,8 +1,9 @@
-package main
+package run
 
 import (
 	"context"
 	"log"
+	"os"
 	"os/exec"
 
 	"github.com/coder/websocket"
@@ -10,14 +11,12 @@ import (
 )
 
 // ui --- websocket --- PTY master --- PTY slave(stdin,stdout,stderr and tty) --- command process
-func RunCommand_Pty(conn *websocket.Conn, name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+func StartCommand_Pty(conn *websocket.Conn, cmd *exec.Cmd) (*os.File, error) {
 	var err error
-	ptmx, err = pty.Start(cmd)
+	ptmx, err := pty.Start(cmd)
 	if err != nil {
-		return err
+		return ptmx, err
 	}
-	defer ptmx.Close()
 
 	// Read from ptmx, send to conn
 	go func() {
@@ -37,23 +36,21 @@ func RunCommand_Pty(conn *websocket.Conn, name string, args ...string) error {
 	}()
 
 	// Read from conn, send to ptmx
-	for {
-		_, buf, err := conn.Read(context.Background())
-		if err != nil {
-			log.Printf("conn.Write: %v", err)
-			break
-		}
-		log.Printf("read from websocket term: %v", buf)
+	go func() {
+		for {
+			_, buf, err := conn.Read(context.Background())
+			if err != nil {
+				log.Printf("conn.Write: %v", err)
+				break
+			}
+			log.Printf("read from ws-term: %v", buf)
 
-		if _, err := ptmx.Write(buf); err != nil {
-			log.Printf("ptmx.Write: %v", err)
-			break
+			if _, err := ptmx.Write(buf); err != nil {
+				log.Printf("ptmx.Write: %v", err)
+				break
+			}
 		}
-	}
+	}()
 
-	// wait cmd
-	if err := cmd.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return ptmx, nil
 }

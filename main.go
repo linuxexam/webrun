@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	"embed"
-	"encoding/json"
 	"flag"
 	"io/fs"
 	"log"
@@ -11,8 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/coder/websocket"
-	"github.com/creack/pty"
+	"github.com/linuxexam/webrun/util"
 )
 
 //go:embed ui
@@ -41,77 +38,60 @@ func main() {
 	args[0] = path
 
 	// web UI
-	if dev {
-		http.Handle("/", http.FileServer(http.Dir("ui")))
-	} else {
-		sub, err := fs.Sub(UI, "ui")
-		if err != nil {
-			panic(err)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// TODO: login
+		clientID := util.GenerateUUID()
+		cookie := &http.Cookie{
+			Name:     "client_id",
+			Value:    clientID,
+			Path:     "/",
+			MaxAge:   3600,
+			HttpOnly: true,
+			Secure:   false,
 		}
-		http.Handle("/", http.FileServer(http.FS(sub)))
-	}
+		http.SetCookie(w, cookie)
+		NewClient(clientID, args[0], args[1:]...)
 
-	// websocket handler for terminal proto
-	http.HandleFunc("/ws-term", func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Println("ws-term websocket connected.")
-		defer func() {
-			c.CloseNow()
-			log.Println("ws-term websocket disconnected.")
-		}()
-
-		// Run the command
-		if err := RunCommand(c, args[0], args[1:]...); err != nil {
-			log.Printf("command exit: %v", err)
+		if dev {
+			http.FileServer(http.Dir("ui")).ServeHTTP(w, r)
+		} else {
+			sub, err := fs.Sub(UI, "ui")
+			if err != nil {
+				panic(err)
+			}
+			http.FileServer(http.FS(sub)).ServeHTTP(w, r)
 		}
 	})
 
 	// websocket handler for admin
 	// e.g. winsize change event
 	http.HandleFunc("/ws-admin", func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, nil)
+		idCookie, err := r.Cookie("client_id")
 		if err != nil {
-			log.Fatal(err)
+			http.NotFound(w, r)
+			return
 		}
-		log.Println("ws-admin websocket connected.")
-		defer func() {
-			c.CloseNow()
-			log.Println("ws-admin websocket disconnected.")
-		}()
+		client := FindClient(idCookie.Value)
+		if client == nil {
+			http.NotFound(w, r)
+			return
+		}
+		client.ServeAdmin(w, r)
+	})
 
-		for {
-			_, buf, err := c.Read(context.Background())
-			if err != nil {
-				log.Printf("c.Read: %v", err)
-				break
-			}
-			msg := string(buf)
-			log.Printf("ws-admin: %s\n", msg)
-			var data map[string]interface{}
-			err = json.Unmarshal(buf, &data)
-			if err != nil {
-				log.Println("Error unmarshalling JSON:", err)
-				break
-			}
-			var cols uint16
-			var rows uint16
-			if data["type"] == "winsize" {
-				cols = uint16(data["cols"].(float64))
-				rows = uint16(data["rows"].(float64))
-			}
-			if ptmx != nil {
-				err := pty.Setsize(ptmx, &pty.Winsize{
-					Rows: rows,
-					Cols: cols,
-				})
-				if err != nil {
-					log.Printf("Set ptmx size failed")
-				}
-			}
+	// websocket handler for terminal proto
+	http.HandleFunc("/ws-term", func(w http.ResponseWriter, r *http.Request) {
+		idCookie, err := r.Cookie("client_id")
+		if err != nil {
+			http.NotFound(w, r)
+			return
 		}
+		client := FindClient(idCookie.Value)
+		if client == nil {
+			http.NotFound(w, r)
+			return
+		}
+		client.ServeTerm(w, r)
 	})
 
 	log.Fatal(http.ListenAndServe(*listen, nil))

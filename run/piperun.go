@@ -1,9 +1,10 @@
-package main
+package run
 
 import (
 	"bytes"
 	"context"
 	"log"
+	"os"
 	"os/exec"
 
 	"github.com/coder/websocket"
@@ -15,28 +16,23 @@ import (
 // This works on Windows as well, as there is no PTY involved
 // Without PTY, some simulation of line descipline function built into TTY driver
 // has to be somewhat impleted explicitly here. e.g. CTR+C
-func RunCommand_Pipe(conn *websocket.Conn, name string, args ...string) error {
-	ctx, cancelCmd := context.WithCancel(context.Background())
-	defer cancelCmd()
-
-	cmd := exec.CommandContext(ctx, name, args...)
-
+func StartCommand_Pipe(conn *websocket.Conn, cmd *exec.Cmd) (*os.File, error) {
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := cmd.Start(); err != nil {
-		return err
+		return nil, err
 	}
 
 	// cmd stdout ---> conn
@@ -87,7 +83,6 @@ func RunCommand_Pipe(conn *websocket.Conn, name string, args ...string) error {
 
 			// CTRL + C = "0x03"
 			if bytes.Contains(msg, []byte("\x03")) {
-				cancelCmd()
 				break
 			}
 			// ENTER(\r) --- > \n
@@ -104,8 +99,5 @@ func RunCommand_Pipe(conn *websocket.Conn, name string, args ...string) error {
 		}
 	}()
 
-	if err := cmd.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return nil, nil
 }
